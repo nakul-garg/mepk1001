@@ -1,0 +1,2 @@
+# No third-party pip packages are required on the Raspberry Pi.
+# The solver is vendored and the API uses Python's standard library.

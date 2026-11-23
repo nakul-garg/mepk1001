@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cube Lab · Solver Console</title>
+<title>TA6 · Cube Solver</title>
 <style>
 :root{color-scheme:dark;--bg:#101114;--panel:#191b20;--line:#2a2d35;--muted:#9398a5;--ink:#f3f4f7;--lime:#c6f277;--blue:#8caaff}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 52% 36%,#23252c 0,#15161a 40%,var(--bg) 78%);color:var(--ink);font:14px/1.45 Inter,Segoe UI,system-ui,sans-serif;min-height:100vh}
@@ -14,7 +14,7 @@ main{max-width:1320px;margin:auto;padding:34px 32px 52px}.eyebrow{font-size:11px
 </style>
 </head>
 <body>
-<header><div class="brand"><span class="mark">▦</span><div>Cube Lab<small>Robot control · 3×3×3</small></div></div><div class="server"><span class="dot"></span>Laptop solver API</div></header>
+<header><div class="brand"><span class="mark">▦</span><div>TA6<small>Robot control · 3×3×3</small></div></div><div class="server"><span class="dot"></span>Laptop solver API</div></header>
 <main><div class="heading"><div><div class="eyebrow">Cube state monitor</div><h1>Solver console</h1></div><p>Inspect the cube, generate a scramble, or load a scan from the Raspberry Pi.</p></div>
 <div class="layout"><section class="panel"><div class="panel-head"><h2>3D cube model</h2><span class="tag" id="cubeTag">Solved state</span></div><div class="view" id="view"><div class="cube" id="cube"></div><span class="cube-label">Click face to turn · drag to orbit</span><span class="view-hint">LEFT CLICK: CLOCKWISE · RIGHT CLICK: COUNTERCLOCKWISE</span></div>
 <div class="controls"><div class="row"><button class="btn primary" id="scramble">Generate scramble</button><button class="btn" id="reset">Reset solved</button><select class="select" id="scrambleLength"><option value="20">20 moves</option><option value="25">25 moves</option><option value="30">30 moves</option></select><span class="status" id="moveStatus">0 moves</span></div><div class="row" id="moveButtons"></div></div></section>

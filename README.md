@@ -1,34 +1,85 @@
-# Rubik's Cube Solver (laptop + Raspberry Pi)
+# TA6 Cube Solver
 
-This project puts the search on the laptop and exposes a small HTTP API for the Pi. It uses Kociemba's two-phase solver, which produces short practical solutions but does **not** guarantee the mathematical shortest solution for every scramble. The vendored pure-Python fallback avoids requiring a C++ compiler, but runs slower than the native extension.
+TA6 is a five-motor Rubik's Cube robot. The Raspberry Pi runs the Kociemba two-phase solver and robot API. A laptop runs the dashboard and forwards requests to the Pi. Kociemba finds short practical solutions but does not guarantee the mathematically shortest solution for every state.
 
-## Laptop server
+## Current status
 
-From `server/`, install `requirements.txt`, then run:
+- The dashboard has a 3D cube, mouse turns, random/custom scrambles, and multiple candidate routes ranked by an estimated time or move count.
+- The Pi can solve a supplied 54-sticker facelet string in URFDLB order and reject impossible states.
+- The first laptop server to contact the Pi claims it while the Pi solver process is running. Restarting the Pi solver releases that claim.
+- Camera recognition is a calibration scaffold only. Real MKS/TMC motor control is not configured; the executor remains dry-run. There is no top-face motor, so U turns require a regrip.
+
+## Requirements
+
+- Current Raspberry Pi OS with Python 3. The Pi solver uses the standard library and bundled solver; no pip install is needed on the Pi.
+- A Windows laptop with Git and Python 3.10 or newer.
+- Pi and laptop on the same reachable local network. Enable SSH on the Pi for the copy instructions below.
+- Allow the laptop dashboard through Windows Firewall on a Private network if prompted. Laptop dashboard port is 8010; Pi API port is 8011.
+
+## Set up a new laptop
+
+Open PowerShell and clone TA6:
 
 ```powershell
-python -m pip install -r requirements.txt
-python -m uvicorn app:app --host 0.0.0.0 --port 8010
+git clone https://github.com/nakul-garg/mepk1001.git TA6
+cd TA6
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r laptop_server\requirements.txt
 ```
 
-Open `http://LAPTOP_IP:8010/` for the cube dashboard. It renders the current facelets on an animated 3D model, creates virtual scrambles, accepts mouse face turns, requests a solution, and reads the latest Pi scan. Click a visible face for a clockwise turn, right-click for counterclockwise; the picked face is determined from the 3D camera ray and cube rotation. The Pi can publish a scan with `upload_scanned_state(server, facelets)` from `raspberry_pi/client.py`; the camera capture and color calibration pipeline still needs to be connected for your camera.
+If PowerShell blocks environment activation, run the setup commands in a new PowerShell window or use .venv\Scripts\python.exe explicitly in the server command below.
 
-The Pi sends `POST /solve` with JSON `{"facelets":"...54 letters..."}`. Facelets are ordered U, R, F, D, L, B, nine stickers per face, and each letter denotes the color of that face's center sticker. The response includes standard Singmaster notation and a move count. `POST /validate` checks the same input and returns whether it is physically solvable. It rejects bad color counts and cube states that violate piece, orientation, or parity constraints. Keep the laptop and Pi on the same trusted network.
+## Copy and start the Raspberry Pi solver
 
-## Raspberry Pi
+Copy the whole raspberry_pi folder from the TA6 repository. Do not omit vendor/pure_python or its .pkl pruning tables. From the TA6 root on Windows PowerShell:
 
-Run `python client.py http://LAPTOP_IP:8000 FACELETS` from `raspberry_pi/`. `robot_executor.py` is a five-motor execution scaffold with no top-face motor. It remains dry-run only until the MKS firmware protocol, motor-to-mechanism mapping, and regrip choreography are configured. The motor labels in this file are limited to IDs 0 through 4.
+```powershell
+scp -r .\raspberry_pi pi@raspberrypi.local:~/
+```
 
-## Camera scanning
+Replace raspberrypi.local with the Pi's IP address if name lookup does not work. On the Pi terminal (or over SSH):
 
-A camera view showing three adjacent faces can capture half the stickers at once. The cube can then be reoriented to expose the other three faces; the scan algorithm must track each reorientation so every observation is assigned to the correct face and sticker index. A complete scan still needs calibrated camera geometry and color classification. After each view, the vision code maps observed colors to center-relative U/R/F/D/L/B facelets, then submits the assembled 54-character state. The `/validate` endpoint can flag a scan that is inconsistent or physically impossible before movement.
+```bash
+cd ~/raspberry_pi
+bash setup.sh
+./run_solver.sh
+```
 
-## Deployment status
+Leave this process running. It listens on port 8011. Find the Pi address with hostname -I. No Pi packages or robot ID are required. To release the first-laptop lock, stop the process with Ctrl+C and start it again with ./run_solver.sh.
 
-This is not yet a copy-and-run robot image: the server API and animated cube UI work independently, but camera scanning and MKS motor actuation are still hardware-specific integration points. The Raspberry Pi should run the camera/control client while the laptop server stays on the laptop, matching the selected architecture. If you want the solver to run on the Pi instead, install the same server requirements there and run the API on the Pi.
+## Start the laptop dashboard
 
-The MKS board revision must be confirmed. MKS describes Gen_L V2.x as supporting onboard TMC2209 UART; the Gen_L V1.0 hardware is listed separately. UART-capable drivers alone do not tell us how your particular board is wired or what firmware is running.
+Replace the example address with the Pi address. In PowerShell at the TA6 repository root:
 
-## Needed to finish the robot integration
+```powershell
+$env:PI_SERVER_URL = "http://192.168.1.50:8011"
+Set-Location .\laptop_server
+..\.venv\Scripts\python.exe -m uvicorn app:app --host 0.0.0.0 --port 8010
+```
 
-Please share: (1) what each of the five motors mechanically rotates or presses and whether a motor can turn a face both directions; (2) MKS Monster board revision, driver models, motor wiring and firmware/control interface; (3) camera model, mounting angle/distance, lighting, and how you plan to expose all six faces; (4) Raspberry Pi model and preferred connection to laptop (Wi-Fi/Ethernet/USB); (5) whether the scramble is random legal turns or arbitrary manual states. These determine scan choreography and how to translate solver moves to reliable motor commands.
+Alternatively, with the virtual environment active, enter laptop_server and run:
+
+```powershell
+.\start_server.ps1 -PiUrl http://192.168.1.50:8011
+```
+
+The first laptop server to reach the Pi claims it. Other laptop servers are rejected until the Pi solver restarts. Open http://localhost:8010/ on the laptop. If the Pi address changes, stop and restart the laptop server with its new address.
+
+## Camera scan variables and pixel calibration
+
+The scaffold is raspberry_pi/camera_scan.py. It intentionally contains no guessed pixel coordinates or color calibration. When camera placement is finalized, fill SAMPLE_PIXEL_COORDINATES with named sticker-center locations and COLOR_REFERENCE_RGB with measured color references. Raw samples are retained by sticker name in scan_rgb_variables (for example F5); classified letters are retained in facelet_color_variables. The pixel reader is passed in, so the camera library can be selected once you share the camera model.
+
+A fixed diagonal camera view sees only three faces at once. To read all 54 stickers, the robot will need calibrated additional views using a regrip/rotation sequence, or another observation method. Camera model, sticker orientation, exact pixels, and the regrip sequence are still needed before automatic scanning can run.
+
+## Project folders
+
+- laptop_server: dashboard, Pi proxy, and Windows launcher.
+- raspberry_pi/solver_app.py: standard-library API and Pi-local solver.
+- raspberry_pi/camera_scan.py: named pixel and color variables awaiting calibration.
+- raspberry_pi/robot_executor.py: five-motor contract and dry-run scaffold.
+- server: earlier laptop-local solver retained for reference.
+
+## Hardware integration still needed
+
+The executor will not actuate the MKS Gen I v1 or TMC2209 yet. Confirm motor-to-face assignments, end stops/sensors, UART addresses/settings, steps per quarter-turn, gripping, and regrip orientation tracking before configuring it. Keep the fifth motor for the regrip/access mechanism; do not add a top motor.

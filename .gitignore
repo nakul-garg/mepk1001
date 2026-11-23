@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .git/
 .pushgit/
+.robot_id
 server/uvicorn.log
 server/uvicorn-error.log
 server/vendor/kociemba/
@@ -10,3 +11,5 @@ server/vendor/pure_python/kociemba/ckociemba/
 server/vendor/pure_python/kociemba/cprunetables/
 server/vendor/pure_python/kociemba/build_ckociemba.py
 server/vendor/pure_python/kociemba/command_line.py
+laptop_server/*.log
+

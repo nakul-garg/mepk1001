@@ -19,7 +19,7 @@ try:
 except ImportError:  # Keep /health usable before dependencies are installed.
     kociemba = None
 
-app = FastAPI(title="Rubik's Cube Solver", version="0.1.0")
+app = FastAPI(title="TA6 Cube Solver", version="0.1.0")
 FACE_ORDER = "URFDLB"
 latest_state: str | None = None
 
